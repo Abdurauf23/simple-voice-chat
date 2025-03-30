@@ -1,0 +1,43 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'voice.chat.app'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    // Netty
+    implementation 'io.netty:netty-all:4.1.100.Final'
+
+    // Redis client
+    implementation 'redis.clients:jedis:5.1.0'
+
+    // JSON (Jackson)
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.17.0'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.17.0'
+
+    // Logging (optional but helpful)
+    implementation 'org.slf4j:slf4j-api:2.0.12'
+    runtimeOnly 'org.slf4j:slf4j-simple:2.0.12'
+
+    // Java WebSocket client (for client side)
+    implementation 'org.springframework:spring-websocket:6.1.3'
+    implementation 'org.springframework:spring-messaging:6.1.3'
+    implementation 'org.springframework:spring-core:6.1.3'
+}
+
+application {
+    mainClass = 'server.NettyWebSocketServer'
+}
