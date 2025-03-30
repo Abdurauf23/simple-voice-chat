@@ -1,30 +1,23 @@
 package voice.chat.app.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPromise;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.*;
 import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.WebSocketClientHandshaker;
-import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import io.netty.handler.codec.http.websocketx.*;
 import io.netty.util.CharsetUtil;
 
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.SourceDataLine;
-
+import java.util.function.Consumer;
 
 public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> {
 
     private final WebSocketClientHandshaker handshaker;
     private ChannelPromise handshakeFuture;
-    private static final AudioFormat AUDIO_FORMAT = new AudioFormat(44100.0f, 16, 1, true, false);
-    private SourceDataLine speakers;
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    private Runnable onJoinConfirmed;
+    private Consumer<byte[]> onAudioReceived;
 
     public WebSocketClientHandler(WebSocketClientHandshaker handshaker) {
         this.handshaker = handshaker;
@@ -32,6 +25,14 @@ public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> 
 
     public ChannelFuture handshakeFuture() {
         return handshakeFuture;
+    }
+
+    public void setOnJoinConfirmed(Runnable r) {
+        this.onJoinConfirmed = r;
+    }
+
+    public void setOnAudioReceived(Consumer<byte[]> c) {
+        this.onAudioReceived = c;
     }
 
     @Override
@@ -45,8 +46,9 @@ public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> 
     }
 
     @Override
-    public void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
         Channel ch = ctx.channel();
+
         if (!handshaker.isHandshakeComplete()) {
             handshaker.finishHandshake(ch, (FullHttpResponse) msg);
             System.out.println("[Client] WebSocket handshake complete");
@@ -54,33 +56,18 @@ public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> 
             return;
         }
 
-        if (msg instanceof FullHttpResponse response) {
-            throw new IllegalStateException("Unexpected FullHttpResponse: " + response.content().toString(CharsetUtil.UTF_8));
-        }
-
-        WebSocketFrame frame = (WebSocketFrame) msg;
-
-        if (frame instanceof TextWebSocketFrame text) {
-            System.out.println("[Server]: " + text.text());
-        } else if (frame instanceof BinaryWebSocketFrame binary) {
-            playAudio(binary.content());
-        } else if (frame instanceof CloseWebSocketFrame close) {
-            ch.close();
-        }
-    }
-
-    private void playAudio(ByteBuf content) {
-        try {
-            byte[] audio = new byte[content.readableBytes()];
-            content.readBytes(audio);
-            if (speakers == null) {
-                speakers = AudioSystem.getSourceDataLine(AUDIO_FORMAT);
-                speakers.open(AUDIO_FORMAT);
-                speakers.start();
+        if (msg instanceof TextWebSocketFrame text) {
+            String content = text.text();
+            System.out.println("[Server] " + content);
+        } else if (msg instanceof BinaryWebSocketFrame binary) {
+            ByteBuf buf = binary.content();
+            byte[] audio = new byte[buf.readableBytes()];
+            buf.readBytes(audio);
+            if (onAudioReceived != null) {
+                onAudioReceived.accept(audio);
             }
-            speakers.write(audio, 0, audio.length);
-        } catch (Exception e) {
-            e.printStackTrace();
+        } else if (msg instanceof CloseWebSocketFrame close) {
+            ch.close();
         }
     }
 
@@ -93,4 +80,3 @@ public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> 
         ctx.close();
     }
 }
-
