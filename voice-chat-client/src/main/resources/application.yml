@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: voice-chat-client
+
+voice-chat:
+  server-uri: ws://localhost:8080/ws

@@ -56,6 +56,7 @@ public class VoiceRoomHandler extends SimpleChannelInboundHandler<TextWebSocketF
     }
 
     private void broadcastAudio(ChannelHandlerContext ctx, ObjectNode node) {
+        System.out.println("Broadcasting audio");
         byte[] audio = Base64.getDecoder().decode(node.get("data").asText());
         for (Channel ch : rooms.getOrDefault(currentRoom, Collections.emptyList())) {
             if (ch != ctx.channel()) {
